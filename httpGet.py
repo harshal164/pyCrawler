@@ -8,27 +8,26 @@ import httplib
 import sys
 from optparse import OptionParser
 
-seed ='http://www.redkeep.com/about.php'
+seed ='http://www.houseloan.com/htdocs_folder_list.html'
 
 # request the page
+# return entire webpage, status code and status reason
 def getURL(page):
     #break Apart web address
-    throwAway, PagePath = addressBreaker(page)
+    ServerAdr, PagePath = addressBreaker(page)
+    #build http connection
     conn = httplib.HTTPConnection(ServerAdr)
+    #request connection
     conn.request("GET",PagePath)
+    #get response
     r1 = conn.getresponse()
     if r1.status !=200:
       return -1, r1.status, r1.reason
+    #save all webpage into data var
     data = r1.read()
+	#close the connection cleanly
     conn.close()
-    return data, str(r1.status), r1.reason
-
-def get_page(url):
-  try:
-    import urllib
-    return urllib.urlopen(url).read()
-  except:
-    return ""
+    return data, str(r1.status), r1.reason 
   
 #parse the page and return the part within a HREF tag
 def get_next_target(page): 
@@ -45,7 +44,6 @@ def get_all_links(page):
   while True:
     url, endpos = get_next_target(page)
     if url:
-      url = sanatizeURL(url)
       links.append(url)
       page=page[endpos:]
     else:
@@ -58,6 +56,7 @@ def union(p, q):
     if e not in p:
       p.append(e)
 
+#main engine for crawling the sites
 def crawl_web(seed):
   tocrawl=[seed]
   crawled=[]
@@ -66,10 +65,10 @@ def crawl_web(seed):
     page = tocrawl.pop()
     if page not in crawled:
       print page
-      content, status, reason = getURL(page)
-      #content = get_page(page)
+      content, status, reason = getURL(page) #entire webpage, status code, status reason
       #add_page_to_index(index,page,content)
-      union(tocrawl, get_all_links(content))
+	 if content != -1:
+       union(tocrawl, get_all_links(content))
       crawled.append(page)  
   return crawled 
   #return index   
@@ -86,7 +85,7 @@ def add_page_to_index(index, url, content):
   for word in words:
     add_to_index(index, word, url)
  
-#Checks if the page is properly formatted   
+#Checks if the link is properly formatted   
 def checkPage(page):
   if page.find('http:') == -1:
     print 'Page Error:',page,' incorrectly formated.'
@@ -95,22 +94,28 @@ def checkPage(page):
       page = page[page.find('http:'):]
   return page
 
-def sanatizeURL(page):
-  if page[0]=='.':
-    page = 'http://'+ServerAdr+page[1:]
-  if page[0]=='/':
-    page = 'http://'+ServerAdr+page
-  tld=ServerAdr[ServerAdr.rfind('.'):]
-  domain=ServerAdr[ServerAdr.rfind(tld):]
-  if page.find(ServerAdr)==-1:
-    return ""
-  if page.find('http:') ==-1 or page.find('https:')==-1:
-    page = 'http://'+page
-  else: 
-    return ''  
-  return page
   
-    
+  #####BROKEN NEEDS FIXING
+def sanatizeURL(page):
+  #if page[0]=='.':
+   # page = 'http://'+ServerAdr
+  #if page[0]=='/':
+   # page = 'http://'+ServerAdr
+  if ServerAdr[0]=='.': ServerAdr=domain+ServerAdr[1:]
+  tld=ServerAdr[ServerAdr.rfind('.'):]
+  domain= ServerAdr[ServerAdr.rfind('.',1,ServerAdr.rfind('.')-1)+1:ServerAdr.rfind('.')]
+  return tld, domain
+  #if page.find(ServerAdr)==-1:
+#    return ""
+#  if page.find('http:') ==-1 or page.find('https:')==-1:
+ #   page = 'http://'+page
+  #else: 
+   # return ''  
+  #return page
+  
+#Function breaks apart a link found in a given page
+#@input page This is the entire webpage to find contained links.
+#@output returns the server path and the remaining page yet to be parsed    
 def addressBreaker(page):
   page = checkPage(page)
   if page==-1: 
@@ -121,26 +126,17 @@ def addressBreaker(page):
   path = page[end_server:]
   return server,path
   
-#handle the returned stuff and generate a new page
-def main():
-    # parameter and constants
+
     
-    #checkPage(seed)
-    #crawl_web(seed)
-    #***********UNIT TESTING*****************
-    tld = ServerAdr[ServerAdr.rfind('.'):]
-    domain = ServerAdr[ServerAdr.rfind('.',ServerAdr.rfind('.')+1):]
-    print tld
-    print domain
-    print sanatizeURL('redkeep.com')
-    # call functions
-    quit()
-    #
-
-#call main function
-
+########################################################<module>###################################################################
+#call functions
 ServerAdr, PagePath = addressBreaker(seed)
-main() 
+##Replace original and force the tld and domain to specific value for CMC webcrawling
+#tld, domain = sanatizeURL(ServerAdr)
+tld = '.com'
+domain = 'houseloan'
+crawl_web(seed)
+quit()
 
 
 #*************************************HOLD SECTION******************************************
