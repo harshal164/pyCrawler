@@ -1,0 +1,6 @@
+
+This script will crawl a web pages links (specified by the seed global variable) and build a tree list 
+and then proceed to crawl those links within the scope of being on the accepted servers list.
+
+Execution instructions:
+During this iteration, you will need to change the seed in the code to crawl the site you want and list of accepted servers.
