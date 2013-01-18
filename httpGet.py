@@ -4,6 +4,7 @@
 #This script will crawl a web pages links (specified by the seed global variable) and build a tree list 
 #and then proceed to crawl those links within the scope of being on the accepted servers list.
 #
+from bs4 import BeautifulSoup
 import urllib2
 import re
 import time
@@ -25,7 +26,7 @@ CFTOKEN = '59455161'
 try:
     seed=sys.argv[1]
 except IndexError:
-    seed ='http://google.com'
+    seed ='http://jasimmonsv.com'
 
 ##########################################################
 ###################CLASSES################################
