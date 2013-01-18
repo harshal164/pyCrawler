@@ -16,10 +16,16 @@ import sys
 
 masterTLD = ['.com','.edu','.org']
 masterFileFormat = ['.html','.htm','.php','.asp','.aspx','.jsp','.css','.cfm','.doc','.pdf']
-acceptedServers = ['houseloan.com', 'houseloanemployee.com']
-#vars needed for houseloanemployee 
+#define which servers to stay within - script will not crawl any pages outside these domains
+acceptedServers = ['redkeep.com','jasimmonsv.com']
+#vars needed for cookie/session authentication
 CFID = '77514'
 CFTOKEN = '59455161'
+#define your seeded webpage here to begin crawling
+try:
+    seed=sys.argv[1]
+except IndexError:
+    seed ='http://google.com'
 
 ##########################################################
 ###################CLASSES################################
@@ -219,15 +225,8 @@ def getDomain(page):
   
 ########################################################<module>###################################################################
     
-start = time.clock()
+start = time.time()
 crawled = []
-try:
-    seed=sys.argv[1]
-except IndexError:
-    #seed = 'http://www.houseloanemployee.com/index.cfm'
-    #seed ='http://www.houseloan.com/htdocs_folder_list.html'
-    #seed = 'http://houseloanemployee.com/employee/index.cfm'
-	seed='http://www.redkeep.com/'
 rootPage = WebPage(seed)
 rootPage.crawl_page()
 import random
