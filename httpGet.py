@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 import urllib2
 import re
 import time
+import random
 from urlparse import urlparse
 from urlparse import urljoin
 from urlparse import urlsplit
@@ -17,6 +18,7 @@ import sys
 
 masterTLD = ['.com','.edu','.org']
 masterFileFormat = ['.html','.htm','.php','.asp','.aspx','.jsp','.css','.cfm','.doc','.pdf']
+skipFileFormat = ['.mp3','.pdf']
 #define which servers to stay within - script will not crawl any pages outside these domains
 acceptedServers = ['redkeep.com','jasimmonsv.com']
 #vars needed for cookie/session authentication
@@ -60,7 +62,10 @@ class WebPage:
         elif self.status == '200': #otherwise check that page was successfully retrieved.
             union(tempArray, get_all_links(content, self.seed)) #add all links within the page to a temp array
             crawled.append(self.seed) #add current page to crawled array
-            for e in tempArray: self.links.append(WebPage(e)) #add all links within temp array to self.links array
+            for e in tempArray:
+                if e not in crawled:
+                    crawled.append(e)
+                    self.links.append(WebPage(e)) #add all links within temp array to self.links array
             for e in range(len(self.links)): self.links[e].crawl_page() #depth-first crawl through self.links array
 
     #printLinks function prints the links to the screen
@@ -101,63 +106,52 @@ class WebPage:
 #@output status code 
 #@output status reason
 def getURL(page):
-
-    #build http connection
-    opener = urllib2.build_opener()
-    opener.addheaders.append(('Cookie','CFID='+CFID+'; CFTOKEN='+CFTOKEN))
-    #opener.addheaders.append(('User-agent','Testing Web Crawling Daemon'))
+  #build http connection
+  opener = urllib2.build_opener()
+  opener.addheaders.append(('Cookie','CFID='+CFID+'; CFTOKEN='+CFTOKEN))
+  #opener.addheaders.append(('User-agent','CMC Testing Web Crawling Daemon'))
    
-    #request connection
-    try:
-        r1 = opener.open(page)
-        #get response
-        data = r1.read()
-        if str(r1.code) != '200': return page, -1, r1.code, r1.msg
-        #close the connection cleanly
-    except Exception as inst:
-        print "Error connecting to site: "+str(page)
-        if type(inst) == urllib2.HTTPError:
-            return page, -1, inst.code, inst.msg
-        else: return page, -1, 0, inst
-    finally:
-        opener.close()
-    return r1.geturl(), data, str(r1.code), r1.msg
+  #request connection
+  try:
+    request = urllib2.Request(page)
+    request.add_header('User-agent','Testing Web Crawling Daemon/2.0')
+    r1 = opener.open(request, None, 12)
+    #get response
+    if str(r1.code) != '200': return page, -1, r1.code, r1.msg
+    #close the connection cleanly
+    if page[-4:] in skipFileFormat:
+        print 'Skipping downloading of '+page[-4:]+' file'
+        data = BeautifulSoup()
+    else:data = BeautifulSoup(r1.read())
+  except Exception as inst:
+    print " Error connecting to site: "+str(page)
+    if type(inst) == urllib2.HTTPError:
+      return page, -1, inst.code, inst.msg
+    else: return page, -1, 0, inst
+  finally:
+    opener.close()
+  return r1.geturl(), data, str(r1.code), r1.msg
 #Calls the get_next_target method to retrieve web links one link at a time, and saves 
 #to an array named links.
 #@input page
 #@links array of links contained within a given page
 def get_all_links(page, ServerAdr):
-    links=[]
-    if page == -1:return links
-    while True:
+  links=[]
+  if page == -1:return links
+  for link in page.find_all('a'):
+    url = sanatizeURL(str(link.get('href')),ServerAdr)
+    if url != -1: links.append(url)
+  '''  
+	while True:
         url, endpos = get_next_target(page)
         if url:
             url = sanatizeURL(url,ServerAdr)#This is key function. Sanatize URLs so nothing slips past
             if url != -1:links.append(url)
             page=page[endpos:]
         else:
-            break #url == -1 when there are no more urls to capture from the given page
-    return links
+            break #url == -1 when there are no more urls to capture from the given page'''
+  return links
 
-#parse the page and return the part within a HREF tag
-#@input page a single web page to parse through
-#@output url a given url
-#@output end_quote the position of the final quote
-def get_next_target(page):
-    singleCheck = checkPage(page) #remove double printing of errors in next statement
-    if singleCheck == None or singleCheck == -1: return None,0
-    t = re.findall('href=',page,re.I) #gives results of regular expression search case insensitive
-    if len(t)<1: return None,0
-    start_link = page.find(t[0])
-    if start_link ==-1:
-        return None,0
-    start_quote=start_link+5
-    temp_Quote=page[start_quote] #grabs the type of quote " or '
-    end_quote=page.find(temp_Quote,start_quote+1) #looks for the other end of the given quote above
-    url=page[start_quote+1:end_quote]
-    return url,end_quote
-
-  
 #Union function takes array q and adds contents into array p
 #@input p final array to work with later
 #@input q array that contains items to added into array p
@@ -168,12 +162,14 @@ def union(p, q):
 
  
 #Checks page for "http:"
-#@input page
-#@output page
+#@input page - a web link to see if the page is a string or unicode, and that it has http: or https in front
+#@output page - will return the link that it found to ensure that it works properly.
 #@error return -1 if error.
 def checkPage(page):
     if page==None: return -1
-    if not isinstance(page,str):return -1
+    page = str(page)
+    if not isinstance(page,str):
+        if not isinstance(page,unicode):return -1
     if page.find('http:')>=0:
         return page[page.find('http:'):]
     elif page.find('https:')>=0:
@@ -190,7 +186,7 @@ def sanatizeURL(page, serverAdr):
     assert serverAdr != None, "sanatizeURL failed: serverAdr type None"
     assert type(page) == str, str("sanatizeURL failed: page not of type str: {}").format(page) 
     assert type(serverAdr) == str, "sanatizeURL failed"
-    assert len(page)!=0 or len(serverAdr)!=0, "sanatizeURL failed"
+    assert len(page)>0 or len(serverAdr)>0, "Passed data is missing"
     page = page.strip()
     o = urlparse(page)
     p = urlparse(serverAdr)
@@ -206,15 +202,17 @@ def sanatizeURL(page, serverAdr):
   
   
 #Function breaks apart a link found in a given page
-#@input page This is the entire webpage to find contained links.
-#@output returns the server path and the remaining page yet to be parsed    
+#@input page This is a link to break apart server from path from options
+#@output returns the url server and path    
 def addressBreaker(page):
-    page = checkPage(page)
-    if not isinstance(page, str):return -1, -1
-    if len(page)>0:
-        o = urlparse(page)
-        return o.netloc ,o.path
-    return -1, -1
+  page = checkPage(page)
+  assert (isinstance(page,str) or isinstance(page,unicode))
+  if not isinstance(page, str):
+      if not isinstance(page, unicode):return -1, -1
+  if len(page)>0:
+    o = urlparse(page)
+    return o.netloc ,o.path
+  return -1, -1
 
 def getDomain(page):
     server, path = addressBreaker(page)
@@ -223,26 +221,25 @@ def getDomain(page):
     server = server[:server.rfind('.')]
     domain = server[server.rfind('.')+1:]
     return domain+tld
-  
-########################################################<module>###################################################################
-    
-start = time.time()
-crawled = []
-rootPage = WebPage(seed)
-rootPage.crawl_page()
-import random
-with open('./results.'+str(start)+'.xml','w') as f:
+
+def output(rootPage):
+  with open('./results.'+str(start)+'.xml','w') as f:
     f.write('<Website>\n')
     rootPage.savePages(0,f)
     f.write('</Website>\n')
-f.closed  
-with open('./openIssues.'+str(start)+'.csv','w') as f:
+  f.closed  
+  with open('./openIssues.'+str(start)+'.csv','w') as f:
     rootPage.troubleReport(f)
-f.closed
+  f.closed
+########################################################<module>###################################################################
+
+crawled = []
+rootPage = WebPage(seed)
+
+if __name__ == "__main__":
+  start = time.time()  
+  rootPage.crawl_page()
   
-#crawled, errors, notCrawled = crawl_web(seed)
-#with open('./notCrawledFile', 'w') as f:
-#  for e in notCrawled:
-#    f.write(e+'\n')
-#f.closed'''
-print 'Time Elapsed: '+str(time.clock() - start)
+  '''output results to files'''
+  output(rootPage)
+  print 'Time Elapsed: '+str(time.time() - start)
