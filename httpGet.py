@@ -18,6 +18,7 @@ skipFileFormat = ['.mp3','.pdf']
 #define which servers to stay within - script will not crawl any pages outside these domains
 #acceptedServers = ['redkeep.com','jasimmonsv.com']
 acceptedServers = ['jasimmonsv.com','redkeep.com']
+contentKeywords = re.compile("[Ss]ome [Tt]ext")#RegEx pattern for search for
 #vars needed for cookie/session authentication
 CFID = '77514'
 CFTOKEN = '59455161'
@@ -41,6 +42,7 @@ class WebPage():
         self.server, self.path = addressBreaker(initSeed)
         self.path = str()
         self.brokenImgs = []
+        self.contentFlag = False
 
     #crawl_page function allows the WebPage class to crawl itself using multi-node tree logic
     #@input self self referrer
@@ -64,6 +66,7 @@ class WebPage():
         if self.status == '200': #check that page was successfully retrieved.
             union(tempArray, get_all_links(content, self.seed)) #add all links within the page to a temp array
             self.brokenImgs = get_broken_imgs(content, self.seed)
+            self.contentFlag = checkContent(str(content))
             for e in tempArray:
                 self.links.append(WebPage(e)) #add all links within temp array to self.links array
             for e in range(len(self.links)): #crawl through all the links
@@ -101,6 +104,7 @@ class WebPage():
     def troubleReportImgs(self, f):
         for x in self.brokenImgs: 
             f.write('"BrokenImg","'+self.seed+'","'+x+'"\n')
+        if self.contentFlag: f.write('"ContentAlert","'+self.seed+'","Keyword Found"\n')
         for e in self.links:
             if str(e.status)=='200':
                 e.troubleReportImgs(f)            
@@ -181,6 +185,10 @@ def get_broken_imgs(page, ServerAdr):
     return badImages
     return links
 
+def checkContent(page):
+    if contentKeywords.search(page):
+        return True
+    else: return False
 
 #Union function takes array q and adds contents into array p
 #@input p final array to work with later
