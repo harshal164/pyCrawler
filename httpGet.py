@@ -8,12 +8,8 @@ from bs4 import BeautifulSoup
 import urllib2
 import re
 import time
-import random
 from urlparse import urlparse
 from urlparse import urljoin
-from urlparse import urlsplit
-from urlparse import ParseResult
-from urlparse import urlunparse
 import sys
 
 masterTLD = ['.com','.edu','.org']
@@ -28,12 +24,12 @@ CFTOKEN = '59455161'
 try:
     seed=sys.argv[1]
 except IndexError:
-    seed ='http://jasimmonsv.com'
+    seed = 'http://jasimmonsv.com'
 
 ##########################################################
 ###################CLASSES################################
 ##########################################################
-class WebPage:
+class WebPage():
     
     #default constructor to build blank WebPage
     def __init__(self, initSeed):
@@ -47,27 +43,32 @@ class WebPage:
     #crawl_page function allows the WebPage class to crawl itself using multi-node tree logic
     #@input self self referrer
     #@output none
-    def crawl_page(self):
+    def crawl_page(self, parent=None):
         tempArray = []
-        print str(self.seed)
-        serverCheck = getDomain(self.seed)
+        if parent != None:
+            if parent.seed not in crawled: crawled.append(parent.seed)
+            if (parent.seed == self.seed):return
         if (self.seed in crawled): #skips pulling url if already called... need to add another round to data to populate missed data.
             self.status = 100
             self.reason='Already Crawled'
             return
-        self.seed, content, self.status, self.reason = getURL(self.seed) #entire webpage, status code, status reason
-        if serverCheck not in acceptedServers: #check that the page's server is on the acceptedServers list
+        print str(self.seed)
+        if getDomain(self.seed) not in acceptedServers: #check that the page's server is on the acceptedServers list
+            passedSeed, content, self.status, self.reason = getURL(self.seed, True) #entire webpage, status code, status reason
             crawled.append(self.seed)
             return #drop out of this current iteration
-        elif self.status == '200': #otherwise check that page was successfully retrieved.
+        passedSeed, content, self.status, self.reason = getURL(self.seed) #entire webpage, status code, status reason
+        crawled.append(self.seed) #add current page to crawled array
+        if self.status == '200': #check that page was successfully retrieved.
             union(tempArray, get_all_links(content, self.seed)) #add all links within the page to a temp array
-            crawled.append(self.seed) #add current page to crawled array
             for e in tempArray:
-                if e not in crawled:
-                    crawled.append(e)
-                    self.links.append(WebPage(e)) #add all links within temp array to self.links array
-            for e in range(len(self.links)): self.links[e].crawl_page() #depth-first crawl through self.links array
-
+                self.links.append(WebPage(e)) #add all links within temp array to self.links array
+            for e in range(len(self.links)):
+                if self.links[e] not in crawled:
+                    self.links[e].crawl_page(self) #depth-first crawl through self.links array
+                else: return
+        else: crawled.append(self.seed)
+        return
     #printLinks function prints the links to the screen
     #@input self self referrer
     #@input n level of child node from parent
@@ -93,64 +94,68 @@ class WebPage:
             if (str(e.status) != '200'): 
                 if (str(e.status) != '100'):
                     f.write('"'+str(e.status)+'","'+self.seed+'","'+e.seed+'"\n')
-        for e in self.links:
-            if str(e.status) == '200':
+            elif str(e.status) == '200':
                 e.troubleReport(f)                
 ##########################################################
 #########END CLASSES######################################
 ##########################################################
-
+    
 # request the page
 #@input page link to a single webpage
 #@output data entire webpage code
 #@output status code 
 #@output status reason
-def getURL(page):
-  #build http connection
-  opener = urllib2.build_opener()
-  opener.addheaders.append(('Cookie','CFID='+CFID+'; CFTOKEN='+CFTOKEN))
-  #opener.addheaders.append(('User-agent','CMC Testing Web Crawling Daemon'))
+def getURL(page, passed=False):
+    #build http connection
+    opener = urllib2.build_opener()
+    opener.addheaders.append(('Cookie','CFID='+CFID+'; CFTOKEN='+CFTOKEN))
+    #opener.addheaders.append(('User-agent','CMC Testing Web Crawling Daemon'))
    
-  #request connection
-  try:
-    request = urllib2.Request(page)
-    request.add_header('User-agent','Testing Web Crawling Daemon/2.0')
-    r1 = opener.open(request, None, 12)
-    #get response
-    if str(r1.code) != '200': return page, -1, r1.code, r1.msg
-    #close the connection cleanly
-    if page[-4:] in skipFileFormat:
-        print 'Skipping downloading of '+page[-4:]+' file'
-        data = BeautifulSoup()
-    else:data = BeautifulSoup(r1.read())
-  except Exception as inst:
-    print " Error connecting to site: "+str(page)
-    if type(inst) == urllib2.HTTPError:
-      return page, -1, inst.code, inst.msg
-    else: return page, -1, 0, inst
-  finally:
-    opener.close()
-  return r1.geturl(), data, str(r1.code), r1.msg
+    #request connection
+    try:
+        request = urllib2.Request(page.replace(" ","%20"))
+        request.add_header('User-agent','Testing Web Crawling Daemon/2.0')
+        r1 = opener.open(request, timeout= 12)
+        #get response
+        if str(r1.code) != '200': return page, -1, r1.code, r1.msg
+        #close the connection cleanly
+        if page[-4:] in skipFileFormat:
+            print 'Skipping downloading of '+page[-4:]+' file'
+            data = BeautifulSoup()
+        elif passed: data=BeautifulSoup()
+        else:data = BeautifulSoup(r1.read())
+    except Exception as inst:
+        print " Error connecting to site: "+str(page)
+        if type(inst) == urllib2.HTTPError:
+            return page, -1, inst.code, inst.msg
+        else: return page, -1, 0, inst
+    finally:
+        opener.close()
+    return r1.geturl(), data, str(r1.code), r1.msg
 #Calls the get_next_target method to retrieve web links one link at a time, and saves 
 #to an array named links.
 #@input page
 #@links array of links contained within a given page
 def get_all_links(page, ServerAdr):
-  links=[]
-  if page == -1:return links
-  for link in page.find_all('a'):
-    url = sanatizeURL(str(link.get('href')),ServerAdr)
-    if url != -1: links.append(url)
-  '''  
-	while True:
-        url, endpos = get_next_target(page)
-        if url:
-            url = sanatizeURL(url,ServerAdr)#This is key function. Sanatize URLs so nothing slips past
-            if url != -1:links.append(url)
-            page=page[endpos:]
-        else:
-            break #url == -1 when there are no more urls to capture from the given page'''
-  return links
+    links=[]
+    if page == -1:return links
+    for link in page.find_all('a'):
+        passLink = link.get('href')
+        if passLink !=None:
+            url = sanatizeURL(str(passLink),ServerAdr)
+            if url != -1: links.append(url)
+    return links
+
+def get_all_imgs(page, ServerAdr):
+    links=[]
+    if page == -1:return links
+    for link in page.find_all('img'):
+        passLink = link.get('src')
+        if passLink !=None:
+            url = sanatizeURL(str(passLink),ServerAdr)
+            if url != -1: links.append(url)
+    return links
+
 
 #Union function takes array q and adds contents into array p
 #@input p final array to work with later
@@ -158,7 +163,8 @@ def get_all_links(page, ServerAdr):
 def union(p, q):
     for e in q:
         if e not in p:
-            p.append(e)
+            if e not in crawled:
+                p.append(e)
 
  
 #Checks page for "http:"
@@ -202,17 +208,17 @@ def sanatizeURL(page, serverAdr):
   
   
 #Function breaks apart a link found in a given page
-#@input page This is a link to break apart server from path from options
-#@output returns the url server and path    
+#@input page This is a link to find contained links.
+#@output returns the server path and the remaining page yet to be parsed    
 def addressBreaker(page):
-  page = checkPage(page)
-  assert (isinstance(page,str) or isinstance(page,unicode))
-  if not isinstance(page, str):
-      if not isinstance(page, unicode):return -1, -1
-  if len(page)>0:
-    o = urlparse(page)
-    return o.netloc ,o.path
-  return -1, -1
+    #page = checkPage(page)
+    assert (isinstance(page,str) or isinstance(page,unicode)), str(page)+' is not a str or unicode'
+    if not isinstance(page, str):
+        if not isinstance(page, unicode):return -1, -1
+    if len(page)>0:
+        o = urlparse(page)
+        return o.netloc ,o.path
+    return -1, -1
 
 def getDomain(page):
     server, path = addressBreaker(page)
@@ -223,23 +229,24 @@ def getDomain(page):
     return domain+tld
 
 def output(rootPage):
-  with open('./results.'+str(start)+'.xml','w') as f:
-    f.write('<Website>\n')
-    rootPage.savePages(0,f)
-    f.write('</Website>\n')
-  f.closed  
-  with open('./openIssues.'+str(start)+'.csv','w') as f:
-    rootPage.troubleReport(f)
-  f.closed
+    with open('./results.'+str(start)+'.xml','w') as f:
+        f.write('<Website>\n')
+        rootPage.savePages(0,f)
+        f.write('</Website>\n')
+    f.closed  
+    with open('./openIssues.'+str(start)+'.csv','w') as f:
+        f.write('"status","Parent","Link"\n')
+        rootPage.troubleReport(f)
+    f.closed
 ########################################################<module>###################################################################
 
 crawled = []
 rootPage = WebPage(seed)
 
 if __name__ == "__main__":
-  start = time.time()  
-  rootPage.crawl_page()
+    start = time.time()  
+    rootPage.crawl_page()
   
-  '''output results to files'''
-  output(rootPage)
-  print 'Time Elapsed: '+str(time.time() - start)
+    '''output results to files'''
+    output(rootPage)
+    print 'Time Elapsed: '+str(time.time() - start)

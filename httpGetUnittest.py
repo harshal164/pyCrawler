@@ -13,21 +13,22 @@ class TestCheckPage(unittest.TestCase):
 	
 class TestAddressBreaker(unittest.TestCase):
   def setUp(self):
-    self.link = [['http://a1.com','/'],
-	             ['https://a2.com','/'],
-				 ['ftp://a3.com','/'],
-				 ['www.a4.com','/'],
-				 ['a5.com','/'],
-				 ['www.a6.com/index','a6.com','/index'],
-				 ['www.a7.com/index.html','a7.com','/index.html'],
-				 ['www.a8.com/index?testing','a8.com','/index'],
-				 ['www.a9.com/index?testing=1234','a9.com','/index'],
-				 ['www.a10.com/index?testing=134#blah','a10.com','index']
+    self.link = [['http://a1.com',''],
+	             ['https://a2.com',''],
+				 ['ftp://a3.com',''],
+				 ['www.a4.com',''],
+				 ['a5.com',''],
+				 ['www.a6.com/index','/index'],
+				 ['www.a7.com/index.html','/index.html'],
+				 ['www.a8.com/index?testing','/index'],
+				 ['www.a9.com/index?testing=1234','/index'],
+				 ['www.a10.com/index?testing=134#blah','index']
 				]
 	
   def runTest(self):
     for x in range(len(self.link)):
-	  assert hg.addressBreaker(self.link[x][0])==self.link[x][1]
+      netlock, path = hg.addressBreaker(self.link[x][0])
+      assert path==self.link[x][1],self.link[x][0]+':'+path+':'+self.link[x][1]+':'+str(type(path))
 	
 class TestGetDomain(unittest.TestCase):
   def setUp(self):
