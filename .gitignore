@@ -17,6 +17,8 @@ local.properties
 .loadpath
 openIssues.*
 results.*
+beautifulsoup4-4.*
+notes.txt
 
 # External tool builders
 .externalToolBuilders/
