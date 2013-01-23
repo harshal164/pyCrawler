@@ -19,6 +19,7 @@ openIssues.*
 results.*
 beautifulsoup4-4.*
 notes.txt
+*.log
 
 # External tool builders
 .externalToolBuilders/

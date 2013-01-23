@@ -11,7 +11,9 @@ import time
 from urlparse import urlparse
 from urlparse import urljoin
 import sys
+import logging
 
+logging.basicConfig(format='%(asctime)s %(message)s',filename='crawler.log', level=logging.DEBUG)
 masterTLD = ['.com','.edu','.org']
 masterFileFormat = ['.html','.htm','.php','.asp','.aspx','.jsp','.css','.cfm','.doc','.pdf']
 skipFileFormat = ['.mp3','.pdf']
@@ -56,7 +58,7 @@ class WebPage():
             self.status = 100
             self.reason='Already Crawled'
             return
-        print str(self.seed)
+        print(self.seed)
         if getDomain(self.seed) not in acceptedServers: #check that the page's server is on the acceptedServers list
             content, self.status, self.reason = getURL(self.seed, True) #save status code and status reason
             crawled.append(self.seed) #mark this page as crawled
@@ -130,12 +132,12 @@ def getURL(page, passed=False):
         if str(r1.code) != '200': return -1, r1.code, r1.msg
         #close the connection cleanly
         if page[-4:] in skipFileFormat:
-            print 'Skipping downloading of '+page[-4:]+' file'
+            logging.info('Skipping downloading of %s file',page[-4:])
             data = BeautifulSoup()
         elif passed: data=BeautifulSoup()
         else:data = BeautifulSoup(r1.read())
     except Exception as inst:
-        print " Error connecting to site: "+str(page)
+        logging.warning('Error connecting to site: %s',page)
         if type(inst) == urllib2.HTTPError:
             return -1, inst.code, inst.msg
         else: return -1, 0, inst
@@ -178,7 +180,7 @@ def get_broken_imgs(page, ServerAdr):
             if str(r1.code) != '200': badImages.append(e) 
             #close the connection cleanly
         except Exception as inst:
-            print " Error connecting to site: "+str(e)
+            logging.warning('Error connecting to site: %s',e)
             badImages.append(e)
         finally:
             opener.close()
@@ -221,11 +223,11 @@ def checkPage(page):
 #@input page url of page to crawl
 #@output page sanitized page or url
 def sanatizeURL(page, serverAdr):
-    assert page != None, "sanatizeURL failed: page type None"
-    assert serverAdr != None, "sanatizeURL failed: serverAdr type None"
-    assert type(page) == str, str("sanatizeURL failed: page not of type str: {}").format(page) 
-    assert type(serverAdr) == str, "sanatizeURL failed"
-    assert len(page)>0 or len(serverAdr)>0, "Passed data is missing"
+    assert page != None, logging.debug('sanatizeURL failed: page type None')
+    assert serverAdr != None, logging.debug('sanatizeURL failed: serverAdr type None')
+    assert type(page) == str, logging.debug('sanatizeURL failed: page not of type str: %s',page) 
+    assert type(serverAdr) == str, logging.debug('sanatizeURL failed')
+    assert len(page)>0 or len(serverAdr)>0, logging.debug('Passed data is missing')
     page = page.strip()
     o = urlparse(page)
     p = urlparse(serverAdr)
@@ -245,7 +247,7 @@ def sanatizeURL(page, serverAdr):
 #@output returns the server path and the remaining page yet to be parsed    
 def addressBreaker(page):
     #page = checkPage(page)
-    assert (isinstance(page,str) or isinstance(page,unicode)), str(page)+' is not a str or unicode'
+    assert (isinstance(page,str) or isinstance(page,unicode)), logging.debug('%s is not a str or unicode', page)
     if not isinstance(page, str):
         if not isinstance(page, unicode):return -1, -1
     if len(page)>0:
@@ -279,8 +281,11 @@ rootPage = WebPage(seed)
 
 if __name__ == "__main__":
     start = time.time()  
+    logging.info('Time Started: %s',start)
     rootPage.crawl_page()
   
     '''output results to files'''
     output(rootPage)
-    print 'Time Elapsed: '+str(time.time() - start)
+    end = time.time()
+    print 'Time Elapsed: ',end - start
+    logging.info('Time Elapsed: %f.3',end - start)
