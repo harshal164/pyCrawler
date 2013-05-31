@@ -1,6 +1,6 @@
 #! /usr/bin/python
 #Python Version 2.7
-#@AUTHOR: JA Simmons V
+#@AUTHOR: J.A. Simmons V
 import unittest
 import httpGet as hg
 
